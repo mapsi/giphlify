@@ -6,67 +6,32 @@ import { listGifs } from "./graphql/queries";
 Amplify.configure(awsConfig);
 
 const createNewGif = async (e) => {
-  e.preventDefault(); // don't refresh the page after form submit
+  e.preventDefault();
 
   const gif = {
-    // grab the value of the `altText` field
     altText: document.getElementById("altText").value,
-    // grab the value of the `url` field
     url: document.getElementById("url").value,
   };
 
   try {
-    // Make the API request: provide the createGif operation, provide the user's gif data
-    const newGif = await API.graphql(
-      graphqlOperation(createGif, { input: gif })
-    );
-    getGifs();
-    // Print the data to the console once it comes back
-    console.log(newGif);
-    // Reset the form (make the fields blank again)
+    await API.graphql(graphqlOperation(createGif, { input: gif }));
     document.getElementById("create-form").reset();
+    getGifs();
   } catch (err) {
-    // If the request fails, print the error message to the console
     console.error(err);
   }
 };
-
-// run our createNewGif function when the form is submitted
-document.getElementById("create-form").addEventListener("submit", createNewGif);
-
 let currentGifId = "";
 const getGifs = async () => {
-  // select the container element
   const container = document.querySelector(".container");
-  // reset its current contents
   container.innerHTML = "";
-  // make a request to get all our gifs
   const gifs = await API.graphql(graphqlOperation(listGifs));
-  // loop through our gifs and
-  gifs.data.listGifs.items.map((gif) => {
-    // create a new image element
-    const img = document.createElement("img");
-    // add the src attribute to the img
-    img.setAttribute("src", gif.url);
-    // add the alt attribute to the img
-    img.setAttribute("alt", gif.altText);
-
-    img.addEventListener("click", () => {
-      currentGifId = gif.id;
-      document.getElementById("edit-altText").value = gif.altText;
-      document.getElementById("edit-url").value = gif.url;
-      document.getElementById("edit-title").innerText = `Update ${gif.altText}`;
-    });
-    // add the image to the container
-    document.querySelector(".container").appendChild(img);
-  });
+  gifs.data.listGifs.items.map(createGifUi);
 };
 
-const editGif = async (e) => {
-  e.preventDefault();
-
+const editGif = async () => {
   try {
-    return await API.graphql(
+    await API.graphql(
       graphqlOperation(updateGif, {
         input: {
           id: currentGifId,
@@ -75,13 +40,11 @@ const editGif = async (e) => {
         },
       })
     );
+    getGifs();
   } catch (err) {
     console.error(err);
   }
-  getGifs();
 };
-
-document.getElementById("edit-form").addEventListener("submit", editGif);
 
 const removeGif = async () => {
   await API.graphql(
@@ -89,10 +52,52 @@ const removeGif = async () => {
       input: { id: currentGifId },
     })
   );
-  getGifs();
 };
 
-document.getElementById("delete-button").addEventListener("click", removeGif);
+const populateModal = (gif) => {
+  currentGifId = gif.id;
+  document.getElementById("edit-modal").classList.remove("hidden");
+  document.getElementById("edit-altText").value = gif.altText;
+  document.getElementById("edit-url").value = gif.url;
+};
 
-// run this function on page load
+const createGifUi = (gif) => {
+  const img = document.createElement("img");
+  img.setAttribute("src", gif.url);
+  img.addEventListener("click", () => populateModal(gif));
+  document.querySelector(".container").appendChild(img);
+  closeCreateModal();
+};
+
+const closeModal = () =>
+  document.getElementById("edit-modal").classList.add("hidden");
+const closeCreateModal = () =>
+  document.getElementById("create-modal").classList.add("hidden");
+
+document
+  .getElementById("close-edit-button")
+  .addEventListener("click", closeModal);
+document
+  .getElementById("close-create-button")
+  .addEventListener("click", closeCreateModal);
+
+document.getElementById("create-form").addEventListener("submit", createNewGif);
+document.getElementById("edit-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  editGif();
+  closeModal();
+});
+
+document.getElementById("delete-button").addEventListener("click", () => {
+  removeGif();
+  getGifs();
+  closeModal();
+});
+
+document
+  .getElementById("plus-button")
+  .addEventListener("click", () =>
+    document.getElementById("create-modal").classList.remove("hidden")
+  );
+
 getGifs();
